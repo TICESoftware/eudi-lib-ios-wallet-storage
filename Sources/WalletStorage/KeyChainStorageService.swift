@@ -48,7 +48,7 @@ public class KeyChainStorageService: DataStorageService {
 		guard var dicts1 = try loadDocumentsData(id: id, docStatus: status) else { return nil }
 		let dicts2 = dicts1.filter(Self.isPrivateKeyRow)
 		dicts1 = dicts1.filter(Self.isDocumentDataRow)
-		let documents = dicts1.compactMap { d1 in Self.makeDocument(dict1: d1, dict2: dicts2.first(where: { d2 in d1[kSecAttrAccount as String] as! String == d2[kSecAttrAccount as String] as! String}), status: status) }
+		let documents = try dicts1.compactMap { d1 in try Self.makeDocument(dict1: d1, dict2: dicts2.first(where: { d2 in d1[kSecAttrAccount as String] as! String == d2[kSecAttrAccount as String] as! String}), status: status) }
 		return documents
 	}
 	
@@ -156,14 +156,50 @@ public class KeyChainStorageService: DataStorageService {
 	/// Make a document from a keychain item
 	/// - Parameter dict: keychain item returned as dictionary
 	/// - Returns: the document
-	static func makeDocument(dict1: [String: Any], dict2: [String: Any]?, status: DocumentStatus) -> Document {
-		var data = dict1[kSecValueData as String] as! Data
+	static func makeDocument(dict1: [String: Any], dict2: [String: Any]?, status: DocumentStatus) throws -> Document {
+        guard var data = dict1[kSecValueData as String] as? Data else {
+            throw StorageError(description: "Could not get data from dict1")
+        }
 		defer { let c = data.count; data.withUnsafeMutableBytes { memset_s($0.baseAddress, c, 0, c); return } }
 		var keyType: PrivateKeyType? = nil; var privateKeyData: Data? = nil
 		if let dict2 {
 			keyType = PrivateKeyType(rawValue: dict2[kSecAttrType as String] as? String ?? PrivateKeyType.derEncodedP256.rawValue)!
 			privateKeyData = (dict2[kSecValueData as String] as! Data)
 		}
-		return Document(id: dict1[kSecAttrAccount as String] as! String, docType: dict1[kSecAttrLabel as String] as? String ?? "", docDataType: DocDataType(rawValue: dict1[kSecAttrType as String] as? String ?? DocDataType.cbor.rawValue) ?? DocDataType.cbor, data: data, privateKeyType: keyType, privateKey: privateKeyData, createdAt: (dict1[kSecAttrCreationDate as String] as! Date), modifiedAt: dict1[kSecAttrModificationDate as String] as? Date, status: status)
+        
+        guard let id = dict1[kSecAttrAccount as String] as? String else {
+            throw StorageError(description: "Invalid id value")
+        }
+        
+        guard let docType = dict1[kSecAttrLabel as String] as? String else {
+            throw StorageError(description: "Invalid doc type value")
+        }
+        
+        let docDataType: DocDataType
+        if let specifiedDataType = dict1[kSecAttrType as String] as? String {
+            guard let parsedDataType = DocDataType(rawValue: specifiedDataType) else {
+                throw StorageError(description: "Invalid doc data type value: \(specifiedDataType)")
+            }
+            docDataType = parsedDataType
+        } else {
+            logger.warning("No data type specified. Falling back to CBOR")
+            docDataType = .cbor
+        }
+        
+        guard let createdAt = dict1[kSecAttrCreationDate as String] as? Date else {
+            throw StorageError(description: "Invalid created at value")
+        }
+        
+        return Document(
+            id: id,
+            docType: docType,
+            docDataType: docDataType,
+            data: data,
+            privateKeyType: keyType,
+            privateKey: privateKeyData,
+            createdAt: createdAt,
+            modifiedAt: dict1[kSecAttrModificationDate as String] as? Date,
+            status: status
+        )
 	}
 }
