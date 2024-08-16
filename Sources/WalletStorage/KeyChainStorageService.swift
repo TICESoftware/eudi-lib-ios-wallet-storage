@@ -52,9 +52,8 @@ public class KeyChainStorageService: DataStorageService {
 		return documents
 	}
 	
-	func loadDocumentsData(id: String?, docStatus: DocumentStatus, dataToLoadType: SavedKeyChainDataType = .doc, bCompatOldVersion: Bool = false) throws -> [[String: Any]]? {
+	func loadDocumentsData(id: String?, docStatus: DocumentStatus, dataToLoadType: SavedKeyChainDataType = .doc) throws -> [[String: Any]]? {
 		var query = makeQuery(id: id, bForSave: false, status: docStatus, dataType: dataToLoadType)
-		if bCompatOldVersion { query[kSecAttrService as String] = if dataToLoadType == .doc { serviceName } else { serviceName + "_key" } } // to be removed in version 1
 		var result: CFTypeRef?
 		let status = SecItemCopyMatching(query as CFDictionary, &result)
 		if status == errSecItemNotFound { return nil }
@@ -63,12 +62,11 @@ public class KeyChainStorageService: DataStorageService {
 			throw StorageError(description: statusMessage ?? "", code: Int(status))
 		}
 		var res = result as! [[String: Any]]
-		if !bCompatOldVersion, dataToLoadType == .doc {
-			if let dicts2 = try loadDocumentsData(id: id, docStatus: docStatus, dataToLoadType: .key, bCompatOldVersion: bCompatOldVersion) { res.append(contentsOf: dicts2) }
+		if dataToLoadType == .doc {
+            if let dicts2 = try loadDocumentsData(id: id, docStatus: docStatus, dataToLoadType: .key) {
+                res.append(contentsOf: dicts2)
+            }
 		}
-		// following lines to be removed in version 1
-		if !bCompatOldVersion, dataToLoadType == .doc { if let dicts1 = try loadDocumentsData(id: id, docStatus: docStatus, dataToLoadType: .doc, bCompatOldVersion: true) { res.append(contentsOf: dicts1) } }
-		if !bCompatOldVersion, dataToLoadType == .key { if let dicts2 = try loadDocumentsData(id: id, docStatus: docStatus, dataToLoadType: .key, bCompatOldVersion: true) {dicts2.forEach { d in var d2 = d; d2[kSecAttrIsNegative as String] = true; res.append(d2) } } }
 		return res
 	}
 	
