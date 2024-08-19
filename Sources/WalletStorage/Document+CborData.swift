@@ -26,7 +26,7 @@ public struct CborData {
 public extension Document {
     
     /// get CBOR data and private key from document
-    func getCborData() throws -> CborData {
+    func getCborData() throws -> CborData? {
         switch docDataType {
         case .signupResponseJson:
             guard let sr = data.decodeJSON(type: SignUpResponse.self),
@@ -48,7 +48,7 @@ public extension Document {
                                        keyData: privateKey).toCoseKeyPrivate()
             return CborData(id: id, iss: iss, dpk: dpk)
         case .sjwt:
-            throw StorageError(description: "Getting CBOR for document based on SDJWT is not implemented")
+            return nil
         }
     }
 }

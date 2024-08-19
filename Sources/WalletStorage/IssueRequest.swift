@@ -39,16 +39,16 @@ public struct IssueRequest {
 		}
 		switch privateKeyType {
 		case .derEncodedP256:
-			let p256 = P256.KeyAgreement.PrivateKey()
+            let p256 = P256.Signing.PrivateKey()
 			self.keyData = p256.derRepresentation
 		case .pemStringDataP256:
-			let p256 = P256.KeyAgreement.PrivateKey()
+			let p256 = P256.Signing.PrivateKey()
 			self.keyData = p256.pemRepresentation.data(using: .utf8)!
 		case .x963EncodedP256:
-			let p256 = P256.KeyAgreement.PrivateKey()
+			let p256 = P256.Signing.PrivateKey()
 			self.keyData = p256.x963Representation
 		case .secureEnclaveP256:
-			let secureEnclaveKey = try SecureEnclave.P256.KeyAgreement.PrivateKey() 
+			let secureEnclaveKey = try SecureEnclave.P256.Signing.PrivateKey() 
 			self.keyData = secureEnclaveKey.dataRepresentation
 		}
 	}
